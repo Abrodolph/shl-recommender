@@ -1,21 +1,23 @@
-# Runtime
-fastapi>=0.115
-uvicorn[standard]>=0.30
-pydantic>=2.7
-python-dotenv>=1.0
+# --- Runtime (pinned) ---------------------------------------------------------
+fastapi==0.136.1
+uvicorn[standard]==0.47.0
+pydantic==2.13.4
+python-dotenv==1.2.2
 
-# Retrieval
-sentence-transformers>=3.0
-rank-bm25>=0.2.2
-numpy>=1.26
+# Retrieval (dense query encoding + lexical). torch is pulled by
+# sentence-transformers; the Dockerfile installs the CPU-only wheel to keep the
+# image small.
+sentence-transformers==5.6.0
+rank-bm25==0.2.2
+numpy==2.5.0
 
-# LLM providers (behind app/llm interface)
-groq>=0.11
-# google-generativeai>=0.7   # optional Gemini swap
+# LLM provider (behind app/llm interface; Gemini is an optional swap)
+groq==1.5.0
+# google-generativeai   # uncomment to use LLM_PROVIDER=gemini
 
-# Build-time only (scraping)
-beautifulsoup4>=4.12
-httpx>=0.27
+# --- Tests --------------------------------------------------------------------
+pytest==9.1.1
+httpx==0.28.1            # also required by fastapi.testclient
 
-# Tests
-pytest>=8.0
+# --- Build-time only (NOT needed at runtime; catalog.json is already shipped) --
+# Install manually to (re)scrape: pip install beautifulsoup4==4.12.3

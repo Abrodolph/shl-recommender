@@ -5,3 +5,9 @@
 __pycache__/
 *.pyc
 venv/
+.venv/
+.pytest_cache/
+
+# HF model cache / scratch
+.hf_cache/
+body.json
