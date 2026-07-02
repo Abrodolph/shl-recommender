@@ -177,9 +177,12 @@ def run(mode: str = "scripted", only: str | None = None) -> dict:
         res = replay_llm(tr, url2id) if mode == "llm" else replay_scripted(tr, url2id)
         rec = recall_at_k(res.final_ids, expected, 10)
         all_returned.extend(res.final_ids)
-        # Exclude LLM-failure conversations from the recall mean (they'd score a
-        # misleading 0); report them separately so the number stays honest.
-        if not res.llm_error:
+        # A conversation is only unscorable if an LLM failure left it with NO
+        # shortlist at all. If it recovered and delivered a final shortlist, the
+        # final list is exactly what the evaluator grades — so score it, even if
+        # an earlier clarify turn hit a transient rate limit.
+        excluded = res.llm_error and not res.final_ids
+        if not excluded:
             pairs.append((res.final_ids, expected))
         rows.append(
             {
@@ -191,10 +194,11 @@ def run(mode: str = "scripted", only: str | None = None) -> dict:
                 "ended": res.ended,
                 "n_recs": len(res.final_ids),
                 "llm_error": res.llm_error,
+                "excluded": excluded,
                 "result": res,
             }
         )
-    n_err = sum(1 for r in rows if r["llm_error"])
+    n_err = sum(1 for r in rows if r["excluded"])
     return {
         "mode": mode,
         "mean_recall": mean_recall_at_k(pairs, 10),
@@ -211,7 +215,8 @@ def print_report(report: dict, show_transcript: bool = False) -> None:
     print(f"CONVERSATIONAL REPLAY  (user={report['mode']})")
     print(line)
     for row in report["rows"]:
-        err = "  LLM_ERROR(excluded)" if row["llm_error"] else ""
+        err = ("  LLM_ERROR(excluded)" if row["excluded"]
+               else "  (recovered after transient error)" if row["llm_error"] else "")
         print(f"  {row['id']:<4} recall={row['recall']:.2f}  {row['hits']}/{row['expected']}"
               f"  turns={row['turns']}  ended={row['ended']}  recs={row['n_recs']}{err}")
         if show_transcript:

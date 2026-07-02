@@ -69,7 +69,8 @@ def build_report(llm_user: bool = False) -> str:
     lines += ["| Trace | Recall | Hits/Exp | Turns | Ended | Recs | Note |",
               "|--|--:|--:|--:|--|--:|--|"]
     for row in conv["rows"]:
-        note = "LLM error (excluded)" if row["llm_error"] else ""
+        note = ("LLM error (excluded)" if row["excluded"]
+                else "recovered after transient error" if row["llm_error"] else "")
         lines.append(f"| {row['id']} | {row['recall']:.2f} | "
                      f"{row['hits']}/{row['expected']} | {row['turns']} | "
                      f"{row['ended']} | {row['n_recs']} | {note} |")
