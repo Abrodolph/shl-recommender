@@ -1,13 +1,3 @@
----
-title: SHL Assessment Recommender
-emoji: 🎯
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 8000
-pinned: false
----
-
 # Conversational SHL Assessment Recommender
 
 A stateless FastAPI service that acts as a conversational agent, helping recruiters
@@ -98,33 +88,7 @@ curl http://localhost:8000/health           # {"status":"ok"}
 (Fly `fly launch` autodetects it; Railway/HF Spaces select "Docker").
 
 > Note: the image includes CPU-only `torch` (needed to encode queries for dense
-> retrieval). Render's free tier (512MB) is tight — bump to `starter`/1GB+ if the
-> build OOMs. Render also requires a card on file to deploy any web service
-> (free or paid) as an anti-abuse measure — if you'd rather not add one, use
-> Hugging Face Spaces below instead (no card required).
-
-### Hugging Face Spaces (no card required)
-
-The YAML frontmatter at the very top of this README (`sdk: docker`,
-`app_port: 8000`) is what Spaces reads to configure the deploy — nothing else
-to write.
-
-1. Create a free account at huggingface.co (no card needed).
-2. **New → Space** → pick a name → **Docker** as the SDK → **CPU basic** hardware
-   (free, 2 vCPU / 16GB — more headroom than Render's free tier).
-3. Push this repo to the Space's git remote (shown on the Space's page after
-   creation; Spaces use `main` as the default branch):
-   ```bash
-   git remote add space https://huggingface.co/spaces/<your-username>/<space-name>
-   git push space master:main
-   ```
-   Authenticate with a Hugging Face **write** access token (Settings → Access
-   Tokens) when prompted for a password.
-4. In the Space's **Settings → Variables and secrets**, add `GROQ_API_KEY` as a
-   **Secret**, and `LLM_PROVIDER=groq` / `LLM_MODEL=llama-3.3-70b-versatile` as
-   plain **Variables**.
-5. The Space rebuilds automatically. Once live, health/chat are reachable at
-   `https://<your-username>-<space-name>.hf.space/health` etc.
+> retrieval). The `starter`/512MB tier is tight — bump to 1GB+ if the build OOMs.
 
 ## Testing
 
