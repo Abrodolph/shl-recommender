@@ -5,7 +5,11 @@ services:
     name: shl-recommender
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter            # 512MB is tight with torch; bump to standard if OOM
+    plan: free                # 512MB RAM, spins down after 15 min idle. Cold
+                               # start (spin-up + our warmup) should still fit
+                               # inside Render's 2-min first-request grace window,
+                               # but resources are tight for torch — bump to
+                               # `starter` if you see OOM in the logs.
     healthCheckPath: /health
     autoDeploy: true
     envVars:
