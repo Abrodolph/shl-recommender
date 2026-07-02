@@ -90,8 +90,13 @@ def handle(
             history_text = " ".join(
                 m["content"] for m in msgs if m.get("role") == "user" and m.get("content")
             )
+            # End the conversation only when the user signals they're done, or
+            # when we're out of turns (forced commit). Matches the traces, which
+            # keep end_of_conversation false on a fresh/edited shortlist and flip
+            # it true only on the user's confirmation turn.
+            final = result.intent == "RECOMMEND_FORCED" or _is_final(last_user)
             return _recommend(
-                result, history_text, retriever=retriever, catalog=catalog
+                result, history_text, final=final, retriever=retriever, catalog=catalog
             )
 
         # CLARIFY (default): ask, no recommendations.
@@ -113,7 +118,9 @@ def handle(
 
 
 # --- intent handlers ----------------------------------------------------------
-def _recommend(result: RouterResult, history_text, retriever, catalog) -> ChatResponse:
+def _recommend(
+    result: RouterResult, history_text, final, retriever, catalog
+) -> ChatResponse:
     from app.assembly import assemble_ids, default_flags
     from app.catalog import get_catalog
     from app.retrieval import get_retriever
@@ -121,7 +128,14 @@ def _recommend(result: RouterResult, history_text, retriever, catalog) -> ChatRe
     catalog = catalog or get_catalog()
     retriever = retriever or get_retriever()
 
-    query = result.search_query or _fallback_query(result.constraints)
+    # Combine the router's focused query with the full user history so
+    # constraints are never dropped on a refine/confirm turn (statelessly
+    # re-deriving the whole picture each turn). Without this, a final "locking it
+    # in" turn retrieves only from that sparse message and the battery collapses.
+    query = " ".join(
+        p for p in (result.search_query or _fallback_query(result.constraints), history_text)
+        if p
+    ).strip()
     # Retrieve a generous candidate pool, then assemble a battery: role/skill
     # items + guaranteed personality/cognitive defaults (unless opted out). This
     # is the main Recall@10 lever (see eval/TUNING_LOG.md).
@@ -143,9 +157,7 @@ def _recommend(result: RouterResult, history_text, retriever, catalog) -> ChatRe
 
     recs = [Recommendation(**it) for it in items]
     reply = shortlist_reply(result.constraints, items)
-    # First/forced commit closes the task; a REFINE leaves room for more edits.
-    end = result.intent in ("RECOMMEND", "RECOMMEND_FORCED")
-    return ChatResponse(reply=reply, recommendations=recs, end_of_conversation=end)
+    return ChatResponse(reply=reply, recommendations=recs, end_of_conversation=final)
 
 
 def _compare(result: RouterResult, catalog) -> ChatResponse:
@@ -183,3 +195,28 @@ def _last_user(messages: list[dict]) -> str:
         if m.get("role") == "user" and m.get("content"):
             return m["content"]
     return ""
+
+
+# Phrases that signal the user is satisfied and the task is complete. Drawn from
+# the trace confirmations ("That's good.", "Locking it in.", "Final list...").
+_FINAL_PHRASES = (
+    "that's good", "thats good", "that works", "sounds good", "looks good",
+    "perfect", "great, thank", "great thanks", "thank you", "thanks", "confirmed",
+    "confirm", "final", "finalize", "finalise", "lock it in", "locking it in",
+    "we're good", "were good", "all set", "good to go", "ship it", "no changes",
+    "that's all", "thats all", "that is all", "nothing else", "that's it",
+)
+# If the user is also asking for a change, it's a refine, not a finalize.
+_MODIFY_MARKERS = (
+    "add", "remove", "drop", "swap", "replace", "change", "instead", " also ",
+    "without", "include", "exclude", "but ", "shorter", "longer", "different",
+)
+
+
+def _is_final(text: str) -> bool:
+    """True if the latest user message signals completion (and isn't also asking
+    for an edit). Drives end_of_conversation for a committed shortlist."""
+    t = f" {text.lower().strip()} "
+    if any(m in t for m in _MODIFY_MARKERS):
+        return False
+    return any(p in t for p in _FINAL_PHRASES)

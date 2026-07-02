@@ -68,7 +68,7 @@ def test_clarify_returns_no_recommendations():
 
 
 # --- RECOMMEND ----------------------------------------------------------------
-def test_recommend_builds_canonical_items_and_ends():
+def test_recommend_builds_canonical_items_and_stays_open():
     result = RouterResult(
         intent="RECOMMEND",
         constraints={"role": "Java developer", "seniority": "mid", "skills": ["Java"]},
@@ -82,8 +82,33 @@ def test_recommend_builds_canonical_items_and_ends():
     )
     assert [r.name for r in resp.recommendations] == ["Java Test 0", "Java Test 1", "OPQ32r"]
     assert resp.recommendations[0].url.endswith("/java-0/")
-    assert resp.end_of_conversation is True
+    # A fresh shortlist leaves the conversation OPEN (matches the traces) —
+    # end flips true only when the user confirms.
+    assert resp.end_of_conversation is False
     assert "3 assessments" in resp.reply
+
+
+def test_recommend_ends_when_user_confirms():
+    result = RouterResult(intent="RECOMMEND", constraints={"role": "dev"}, search_query="java")
+    resp = agent.handle(
+        _msgs("Hiring a Java dev", "That's good, thanks."),
+        router_fn=_router(result),
+        retriever=FakeRetriever(["java-0"]),
+        catalog=CATALOG,
+    )
+    assert len(resp.recommendations) == 1
+    assert resp.end_of_conversation is True
+
+
+def test_recommend_stays_open_when_user_edits():
+    result = RouterResult(intent="REFINE", constraints={"role": "dev"}, search_query="java")
+    resp = agent.handle(
+        _msgs("Hiring a Java dev", "That's good but also add a personality test"),
+        router_fn=_router(result),
+        retriever=FakeRetriever(["java-0", "opq32r"]),
+        catalog=CATALOG,
+    )
+    assert resp.end_of_conversation is False   # "add ..." is an edit, not a finalize
 
 
 def test_recommend_drops_hallucinated_ids_via_catalog():

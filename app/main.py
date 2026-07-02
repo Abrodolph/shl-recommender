@@ -61,7 +61,7 @@ def _warmup() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     # Kick off warmup without blocking startup, so /health answers immediately.
     threading.Thread(target=_warmup, name="warmup", daemon=True).start()
     yield

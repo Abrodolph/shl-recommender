@@ -67,9 +67,14 @@ CLARIFY. `search_query` is told to list *every* distinct skill so multi-skill JD
 don't drop a technology.
 
 ## Evaluation — real numbers
-A deterministic harness (`eval/recall_eval.py`) maps each trace's labeled
-shortlist to catalog ids and computes **Mean Recall@10**; groundedness is 1.0 by
-construction. Per-change results (`eval/TUNING_LOG.md`):
+Two harnesses. `eval/recall_eval.py` is a **deterministic** single-shot proxy
+that maps each trace's labeled shortlist to catalog ids and measures retrieval
+Recall@10 — fast and reproducible, used for tuning. `eval/replay.py` runs each
+trace as a **real multi-turn conversation** through the agent (one router call
+per turn; scripted *or* LLM-simulated user), measuring **conversational**
+Recall@10 + groundedness and flagging any LLM-failure turns so the mean stays
+honest. `eval/probes.py` runs the behavior probes; `eval/report.py` aggregates
+all three into `eval/REPORT.md`. Per-change tuning results (`eval/TUNING_LOG.md`):
 
 | Change | Mean Recall@10 |
 |--------|---------------:|
@@ -94,6 +99,16 @@ paths, and endpoint robustness (timeout/fallback).
 - Remaining misses are near-duplicate product families (short variant loses to
   `-365` sibling) and skill-flooded JDs — ranking/diversity problems, not fusion
   tuning. Returns flattened, so tuning stopped at ~0.72.
+
+## Limitations (named honestly)
+- **Overfit risk:** the +0.19 default-injection was tuned on the 10 *public*
+  traces; OPQ32r/Verify G+ may be less dominant on the holdout set, so the number
+  may not fully transfer. It's the best signal available, but it's a fit to 10
+  conversations.
+- The conversational replay caught a real bug the single-shot proxy hid — a
+  refine/confirm turn retrieving only from the sparse last message — now fixed by
+  combining the router query with the full history (C9: 0.29 → 0.86 conversational
+  recall). This is why the multi-turn harness matters, not just the proxy.
 
 ## AI tools used
 Built with **Claude Code** (Anthropic) for implementation, retrieval tuning, and

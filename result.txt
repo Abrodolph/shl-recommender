@@ -1,0 +1,67 @@
+PS C:\Personal\Code\shl-recommender> python -m pytest -q
+......................................................................................................................                                  [100%]
+118 passed in 22.52s
+PS C:\Personal\Code\shl-recommender> python eval/recall_eval.py --assemble
+Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 103/103 [00:00<00:00, 3569.59it/s]
+==========================================================================
+RETRIEVAL RECALL@10  (query=user-text)
+==========================================================================
+  C1   recall=0.67  2/3
+       missed: ['opq-universal-competency-report-2-0']
+  C2   recall=0.60  3/5
+       missed: ['linux-programming-general', 'smart-interview-live-coding']
+  C3   recall=0.75  3/4
+       missed: ['svar-spoken-english-us-new']
+  C4   recall=0.80  4/5
+       missed: ['basic-statistics-new']
+  C5   recall=0.40  2/5
+       missed: ['global-skills-assessment', 'global-skills-development-report', 'salestransformationreport2-0-individualcontributor']
+  C6   recall=1.00  2/2
+  C7   recall=0.40  2/5
+       missed: ['dependability-and-safety-instrument-dsi', 'medical-terminology-new', 'microsoft-word-365-essentials-new']
+  C8   recall=0.60  3/5
+       missed: ['ms-excel-new', 'ms-word-new']
+  C9   recall=0.71  5/7
+       missed: ['docker-new', 'sql-new']
+  C10  recall=1.00  2/2
+==========================================================================
+  MEAN RECALL@10 = 0.6931
+==========================================================================
+PS C:\Personal\Code\shl-recommender> python eval/recall_eval.py --assemble --router
+Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 103/103 [00:00<00:00, 6832.95it/s]
+==========================================================================
+RETRIEVAL RECALL@10  (query=router)
+==========================================================================
+  C1   recall=0.67  2/3
+       missed: ['opq-universal-competency-report-2-0']
+  C2   recall=0.60  3/5
+       missed: ['linux-programming-general', 'smart-interview-live-coding']
+  C3   recall=0.75  3/4
+       missed: ['svar-spoken-english-us-new']
+  C4   recall=0.80  4/5
+       missed: ['basic-statistics-new']
+  C5   recall=0.60  3/5
+       missed: ['global-skills-assessment', 'global-skills-development-report']
+  C6   recall=1.00  2/2
+  C7   recall=0.40  2/5
+       missed: ['dependability-and-safety-instrument-dsi', 'medical-terminology-new', 'microsoft-word-365-essentials-new']
+  C8   recall=0.60  3/5
+       missed: ['ms-excel-new', 'ms-word-new']
+  C9   recall=0.71  5/7
+       missed: ['docker-new', 'sql-new']
+  C10  recall=1.00  2/2
+==========================================================================
+  MEAN RECALL@10 = 0.7131
+==========================================================================
+PS C:\Personal\Code\shl-recommender> 
+
+PS C:\Personal\Code\shl-recommender> '{"messages":[{"role":"user","content":"I need an assessment"}]}' | Out-File -Encoding utf8 body.json
+>> curl.exe -X POST http://127.0.0.1:8000/chat -H "Content-Type: application/json" -d "@body.json"
+{"reply":"What role are you looking to assess?","recommendations":[],"end_of_conversation":false}
+PS C:\Personal\Code\shl-recommender> '{"messages":[{"role":"user","content":"Hiring a senior Java developer with Spring and SQL"}]}' | Out-File -Encoding utf8 body.json
+>> curl.exe -X POST http://127.0.0.1:8000/chat -H "Content-Type: application/json" -d "@body.json"
+{"reply":"Here are 10 assessments for a senior Java developer, covering Java, Spring, and SQL. These span the skills, ability, and personality signals that fit the role — tell me if you'd like to adjust the mix or drop anything.","recommendations":[{"name":"Java Frameworks (New)","url":"https://www.shl.com/products/product-catalog/view/java-frameworks-new/","test_type":"K"},{"name":"Spring (New)","url":"https://www.shl.com/products/product-catalog/view/spring-new/","test_type":"K"},{"name":"Java Platform Enterprise Edition 7 (Java EE 7)","url":"https://www.shl.com/products/product-catalog/view/java-platform-enterprise-edition-7-java-ee-7/","test_type":"K"},{"name":"Java 8 (New)","url":"https://www.shl.com/products/product-catalog/view/java-8-new/","test_type":"K"},{"name":"Microsoft SQL Server 2014 Programming","url":"https://www.shl.com/products/product-catalog/view/microsoft-sql-server-2014-programming/","test_type":"K"},{"name":"Core Java (Advanced Level) (New)","url":"https://www.shl.com/products/product-catalog/view/core-java-advanced-level-new/","test_type":"K"},{"name":"Java 2 Platform Enterprise Edition 1.4 Fundamental","url":"https://www.shl.com/products/product-catalog/view/java-2-platform-enterprise-edition-1-4-fundamental/","test_type":"K"},{"name":"SQL (New)","url":"https://www.shl.com/products/product-catalog/view/sql-new/","test_type":"K"},{"name":"Occupational Personality Questionnaire OPQ32r","url":"https://www.shl.com/products/product-catalog/view/occupational-personality-questionnaire-opq32r/","test_type":"P"},{"name":"SHL Verify Interactive G+","url":"https://www.shl.com/products/product-catalog/view/shl-verify-interactive-g/","test_type":"A"}],"end_of_conversation":true}
+PS C:\Personal\Code\shl-recommender> '{"messages":[{"role":"user","content":"Is it legal to reject candidates over 50?"}]}' | Out-File -Encoding utf8 body.json
+>> curl.exe -X POST http://127.0.0.1:8000/chat -H "Content-Type: application/json" -d "@body.json"
+{"reply":"I can only help with recommending SHL assessments for a role. I can't help with that — but tell me who you're hiring for and I'll suggest suitable assessments.","recommendations":[],"end_of_conversation":false}
+PS C:\Personal\Code\shl-recommender> 
