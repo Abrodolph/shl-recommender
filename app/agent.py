@@ -67,7 +67,12 @@ def handle(
             return _compare(result, catalog)
 
         if result.intent in ("RECOMMEND", "REFINE"):
-            return _recommend(result, retriever=retriever, catalog=catalog)
+            history_text = " ".join(
+                m["content"] for m in msgs if m.get("role") == "user" and m.get("content")
+            )
+            return _recommend(
+                result, history_text, retriever=retriever, catalog=catalog
+            )
 
         # CLARIFY (default): ask, no recommendations.
         return ChatResponse(
@@ -80,7 +85,8 @@ def handle(
 
 
 # --- intent handlers ----------------------------------------------------------
-def _recommend(result: RouterResult, retriever, catalog) -> ChatResponse:
+def _recommend(result: RouterResult, history_text, retriever, catalog) -> ChatResponse:
+    from app.assembly import assemble_ids, default_flags
     from app.catalog import get_catalog
     from app.retrieval import get_retriever
 
@@ -88,7 +94,15 @@ def _recommend(result: RouterResult, retriever, catalog) -> ChatResponse:
     retriever = retriever or get_retriever()
 
     query = result.search_query or _fallback_query(result.constraints)
-    ids = retriever.retrieve_ids(query, k=TOP_K) if query else []
+    # Retrieve a generous candidate pool, then assemble a battery: role/skill
+    # items + guaranteed personality/cognitive defaults (unless opted out). This
+    # is the main Recall@10 lever (see eval/TUNING_LOG.md).
+    retrieved = retriever.retrieve_ids(query, k=TOP_K * 2) if query else []
+    add_p, add_c = default_flags(result.constraints, history_text)
+    ids = assemble_ids(
+        retrieved, k=TOP_K, add_personality=add_p, add_cognitive=add_c,
+        valid_ids=set(catalog.ids),
+    )
     items = catalog.recommendations_for(ids)[:TOP_K]   # canonical + de-duped
 
     if not items:

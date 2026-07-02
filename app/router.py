@@ -75,7 +75,9 @@ critical","short duration"] (array)
 
 search_query: a single retrieval string synthesizing role + skills + test-type \
 intent + key signals (e.g. "senior Java Spring SQL backend developer cognitive \
-personality"). Empty string for CLARIFY / REFUSE.
+personality"). Include EVERY distinct skill/technology the user named, each as its \
+own term (do not collapse "SQL" and "Docker" into "backend") so no required skill \
+is dropped from retrieval. Empty string for CLARIFY / REFUSE.
 
 named_assessments: for COMPARE only, the assessment names the user referenced \
 (as written). Empty array otherwise.

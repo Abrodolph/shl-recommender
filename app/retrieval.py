@@ -124,11 +124,16 @@ class Retriever:
         return [self.ids[i] for i in order if scores[i] > 0]
 
     def retrieve(
-        self, query: str, k: int = 10, n: int | None = None
+        self,
+        query: str,
+        k: int = 10,
+        n: int | None = None,
+        rrf_k: int = RRF_K,
     ) -> list[tuple[str, float]]:
         """Hybrid retrieve. Runs dense + BM25, fuses with RRF, returns up to ``k``
         ``(id, rrf_score)`` pairs, highest first. ``n`` is the per-retriever
-        candidate depth (defaults to :data:`DEFAULT_CANDIDATE_N`)."""
+        candidate depth (defaults to :data:`DEFAULT_CANDIDATE_N`); ``rrf_k`` is the
+        RRF constant (larger => flatter rank contribution)."""
         if not query or not query.strip():
             return []
         n = n or DEFAULT_CANDIDATE_N
@@ -138,7 +143,7 @@ class Retriever:
         scores: dict[str, float] = {}
         for ranking in (dense, lexical):
             for rank, doc_id in enumerate(ranking):
-                scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (RRF_K + rank + 1)
+                scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (rrf_k + rank + 1)
 
         fused = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
         return fused[:k]
