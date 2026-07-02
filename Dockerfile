@@ -30,7 +30,13 @@ COPY data/ ./data/
 RUN python -c "from sentence_transformers import SentenceTransformer; \
 SentenceTransformer('all-MiniLM-L6-v2')"
 
+# The model is now baked into HF_HOME. Force offline mode so the background
+# warmup thread (app/main.py) never phones home to check for updates — that
+# was adding ~30s of avoidable network round-trips to every cold start.
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+
 EXPOSE 8000
 
-# Shell form so $PORT is expanded at runtime.
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
+# Exec form (via sh -c for $PORT expansion) so signals reach uvicorn directly.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

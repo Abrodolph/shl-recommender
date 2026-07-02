@@ -9,7 +9,7 @@ python-dotenv==1.2.2
 # image small.
 sentence-transformers==5.6.0
 rank-bm25==0.2.2
-numpy==2.5.0
+numpy==2.4.6              # NOT 2.5.0 - that requires Python>=3.12; image is 3.11
 
 # LLM provider (behind app/llm interface; Gemini is an optional swap)
 groq==1.5.0
