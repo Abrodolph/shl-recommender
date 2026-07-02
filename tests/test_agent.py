@@ -192,6 +192,42 @@ def test_near_turn_cap_commits_instead_of_clarifying():
         catalog=CATALOG,
     )
     assert len(resp.recommendations) == 1   # committed rather than asked again
+    assert resp.end_of_conversation is True   # out of turns -> task closed
+
+
+def test_below_turn_cap_still_clarifies():
+    result = RouterResult(intent="CLARIFY", reply_text="Which seniority?")
+    resp = agent.handle(_msgs("a", "b"), router_fn=_router(result))
+    assert resp.recommendations == []       # still gathering context
+    assert resp.reply == "Which seniority?"
+
+
+# --- defensive parsing --------------------------------------------------------
+def test_empty_message_list_does_not_call_router():
+    calls = {"n": 0}
+
+    def spy(messages):
+        calls["n"] += 1
+        return RouterResult(intent="RECOMMEND")
+
+    resp = agent.handle([], router_fn=spy)
+    assert resp.recommendations == []
+    assert resp.reply.strip()
+    assert calls["n"] == 0                   # short-circuited, no LLM call
+
+
+def test_blank_content_messages_short_circuit():
+    resp = agent.handle(_msgs("", "   "), router_fn=_router(RouterResult(intent="RECOMMEND")))
+    assert resp.recommendations == []
+    assert resp.end_of_conversation is False
+
+
+def test_garbage_message_shapes_are_tolerated():
+    # Missing keys / wrong types must not raise — fall back safely.
+    garbage = [{"foo": "bar"}, {"role": "user"}, None, 42]
+    resp = agent.handle(garbage, router_fn=_router(RouterResult(intent="RECOMMEND")))
+    assert isinstance(resp, ChatResponse)
+    assert resp.recommendations == []
 
 
 # --- fallback -----------------------------------------------------------------

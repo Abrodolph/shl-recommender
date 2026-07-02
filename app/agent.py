@@ -19,15 +19,22 @@ before the 8-turn budget runs out, ≤10 recommendations).
 
 from __future__ import annotations
 
+import logging
+import time
+
 from app import guardrails
 from app.replies import compare_reply, shortlist_reply
 from app.router import RouterResult, _fallback_query, route
 from app.schemas import SAFE_FALLBACK, ChatResponse, Message, Recommendation
 
+log = logging.getLogger("shl.agent")
+
 # Retrieval depth. Recall@10 is the metric -> retrieve inclusively toward 10.
 TOP_K = 10
-# Force a commit rather than clarify again once the history is this long, so we
-# never run past the evaluator's 8-turn cap while still gathering context.
+# Evaluator hard cap: user+assistant combined <= 8 turns. Once the history is
+# this long, don't ask another question that needs a reply — commit instead.
+# (history length N means our reply is turn N+1; at N>=6 a further clarify +
+# the user's answer would reach the cap, so we commit now.)
 COMMIT_HISTORY_THRESHOLD = 6
 
 
@@ -43,22 +50,35 @@ def handle(
     Dependencies are injectable for testing; by default they resolve to the
     process singletons (router LLM, hybrid retriever, catalog).
     """
+    t0 = time.perf_counter()
+    intent = "ERROR"
     try:
         msgs = _normalize_messages(messages)
         last_user = _last_user(msgs)
 
+        # Defensive: nothing usable in the payload -> ask, don't call the LLM.
+        if not any(
+            m.get("role") == "user" and (m.get("content") or "").strip() for m in msgs
+        ):
+            intent = "CLARIFY_EMPTY"
+            return ChatResponse(
+                reply=SAFE_FALLBACK.reply, recommendations=[], end_of_conversation=False
+            )
+
         # Deterministic backstop: obvious off-topic / injection -> refuse without
         # spending the LLM call (a second net beside the router's REFUSE).
         if guardrails.should_refuse(last_user):
+            intent = "REFUSE_GUARD"
             return _refuse(guardrails.refusal_reply())
 
         router_fn = router_fn or (lambda m: route(m))
         result: RouterResult = router_fn(msgs)
+        intent = result.intent
 
         # Near the turn budget, don't ask another question — commit with what we
         # have (CLAUDE.md §3/§9: never exceed 8 turns).
         if result.intent == "CLARIFY" and len(msgs) >= COMMIT_HISTORY_THRESHOLD:
-            result.intent = "RECOMMEND"
+            result.intent = intent = "RECOMMEND_FORCED"
 
         if result.intent == "REFUSE":
             return _refuse(result.reply_text or guardrails.refusal_reply())
@@ -66,7 +86,7 @@ def handle(
         if result.intent == "COMPARE":
             return _compare(result, catalog)
 
-        if result.intent in ("RECOMMEND", "REFINE"):
+        if result.intent in ("RECOMMEND", "REFINE", "RECOMMEND_FORCED"):
             history_text = " ".join(
                 m["content"] for m in msgs if m.get("role") == "user" and m.get("content")
             )
@@ -81,7 +101,15 @@ def handle(
             end_of_conversation=False,
         )
     except Exception:
+        log.exception("agent.handle failed; returning safe fallback")
         return SAFE_FALLBACK
+    finally:
+        log.info(
+            "turn intent=%s latency_ms=%d msgs=%s",
+            intent,
+            int((time.perf_counter() - t0) * 1000),
+            len(messages) if hasattr(messages, "__len__") else "?",
+        )
 
 
 # --- intent handlers ----------------------------------------------------------
@@ -115,8 +143,8 @@ def _recommend(result: RouterResult, history_text, retriever, catalog) -> ChatRe
 
     recs = [Recommendation(**it) for it in items]
     reply = shortlist_reply(result.constraints, items)
-    # First commit (RECOMMEND) closes the task; a REFINE leaves room for more edits.
-    end = result.intent == "RECOMMEND"
+    # First/forced commit closes the task; a REFINE leaves room for more edits.
+    end = result.intent in ("RECOMMEND", "RECOMMEND_FORCED")
     return ChatResponse(reply=reply, recommendations=recs, end_of_conversation=end)
 
 
