@@ -13,3 +13,34 @@ Hard constraints (see CLAUDE.md §3, §9):
 - Response schema is exact and always valid.
 - One LLM call per turn; stay well under the 30s timeout.
 """
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from app.agent import handle
+from app.schemas import SAFE_FALLBACK, ChatRequest, ChatResponse
+
+app = FastAPI(title="SHL Assessment Recommender", version="0.1.0")
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Liveness probe. Always 200 with ``{"status": "ok"}`` once the process is
+    up — deliberately independent of catalog/model warmup (CLAUDE.md §3)."""
+    return {"status": "ok"}
+
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(request: ChatRequest) -> ChatResponse:
+    """Stateless chat turn.
+
+    Delegates to ``app.agent.handle`` (one LLM call → route → retrieve →
+    templated reply), always wrapped so any internal failure degrades to
+    :data:`app.schemas.SAFE_FALLBACK` rather than escaping as an invalid
+    contract.
+    """
+    try:
+        return handle(request.messages)
+    except Exception:
+        return SAFE_FALLBACK

@@ -1,0 +1,21 @@
+# Runtime
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+python-dotenv>=1.0
+
+# Retrieval
+sentence-transformers>=3.0
+rank-bm25>=0.2.2
+numpy>=1.26
+
+# LLM providers (behind app/llm interface)
+groq>=0.11
+# google-generativeai>=0.7   # optional Gemini swap
+
+# Build-time only (scraping)
+beautifulsoup4>=4.12
+httpx>=0.27
+
+# Tests
+pytest>=8.0
